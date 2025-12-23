@@ -6,7 +6,20 @@ export const analyzeNote = async (content: string): Promise<AIResult | null> => 
   if (!content || content.length < 10) return null;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Safely access API_KEY to prevent crashing if process.env is not defined
+    let apiKey = '';
+    try {
+      apiKey = process.env.API_KEY || '';
+    } catch (e) {
+      console.warn("Lumina: Environment variables not accessible via process.env");
+    }
+
+    if (!apiKey) {
+      console.error("Lumina: API_KEY is missing. Gemini features disabled.");
+      return null;
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyze the following note content. Provide a concise summary, extract 3-5 keywords, determine the overall sentiment (Positive, Neutral, or Negative), suggest 2-3 related high-level concepts or topics for further research, and extract any actionable tasks. 

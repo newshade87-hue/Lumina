@@ -6,6 +6,14 @@ import NoteEditor from './components/NoteEditor';
 import Auth from './components/Auth';
 import { STORAGE_KEY, THEME_STORAGE_KEY, THEME_CONFIGS, CATEGORIES } from './constants';
 
+// Safe ID generator fallback for non-secure contexts
+const generateSafeId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 const App: React.FC = () => {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -46,12 +54,12 @@ const App: React.FC = () => {
     if (savedNotes) {
       try {
         let parsed = JSON.parse(savedNotes);
-        // Migration: Ensure all notes have pages array
+        // Migration: Ensure all notes have pages array using safe ID generator
         parsed = parsed.map((n: Note) => {
           if (!n.pages || n.pages.length === 0) {
             return {
               ...n,
-              pages: [{ id: crypto.randomUUID(), title: 'Main', content: n.content || '' }],
+              pages: [{ id: generateSafeId(), title: 'Main', content: n.content || '' }],
               activePageIndex: 0
             };
           }
@@ -105,14 +113,14 @@ const App: React.FC = () => {
 
   const handleCreateNote = (category?: string) => {
     const newNote: Note = {
-      id: crypto.randomUUID(),
+      id: generateSafeId(),
       title: '',
       content: '',
       category: category || 'General',
       updatedAt: Date.now(),
       tasks: [],
       tags: [],
-      pages: [{ id: crypto.randomUUID(), title: 'Draft 1', content: '' }],
+      pages: [{ id: generateSafeId(), title: 'Draft 1', content: '' }],
       activePageIndex: 0
     };
     setNotes([newNote, ...notes]);
@@ -158,7 +166,7 @@ const App: React.FC = () => {
       if (!n.pages || n.pages.length === 0) {
         return {
           ...n,
-          pages: [{ id: crypto.randomUUID(), title: 'Main', content: n.content || '' }],
+          pages: [{ id: generateSafeId(), title: 'Main', content: n.content || '' }],
           activePageIndex: 0
         };
       }
@@ -183,9 +191,9 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className={`flex h-screen items-center justify-center bg-black`}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(79,70,229,0.2)]" />
-          <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[8px]">Synchronizing Secure Vault</p>
+        <div className="flex flex-col items-center gap-6">
+          <div className="h-12 w-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(79,70,229,0.3)]" />
+          <p className="text-indigo-400 font-black uppercase tracking-[0.4em] text-[10px] animate-pulse">Synchronizing Secure Vault</p>
         </div>
       </div>
     );

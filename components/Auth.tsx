@@ -3,6 +3,14 @@ import React, { useState } from 'react';
 import { ThemeId, User } from '../types';
 import { THEME_CONFIGS } from '../constants';
 
+// Safe ID generator fallback
+const generateSafeId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 interface AuthProps {
   currentTheme: ThemeId;
   onLogin: (user: User) => void;
@@ -22,7 +30,7 @@ const Auth: React.FC<AuthProps> = ({ currentTheme, onLogin }) => {
     // Simulate API call
     setTimeout(() => {
       const user: User = {
-        id: crypto.randomUUID(),
+        id: generateSafeId(),
         email: email,
         name: isLogin ? email.split('@')[0] : name,
         provider: 'local'
@@ -37,7 +45,7 @@ const Auth: React.FC<AuthProps> = ({ currentTheme, onLogin }) => {
     // Simulate Google OAuth Popup
     setTimeout(() => {
       const user: User = {
-        id: crypto.randomUUID(),
+        id: generateSafeId(),
         email: 'google_user@gmail.com',
         name: 'Lumina Explorer',
         avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lumina',

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Note, ThemeId, User } from '../types';
 import { THEME_CONFIGS, CATEGORIES } from '../constants';
@@ -35,6 +36,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   customCategories,
   onAddCategory,
+  viewingArchive,
+  setViewingArchive,
   onImport,
   user,
   onLogout
@@ -48,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const t = THEME_CONFIGS[currentTheme];
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const allCategories = [...(CATEGORIES || []), ...customCategories];
+  const allCategoriesList = [...(CATEGORIES || []), ...customCategories];
 
   const getFilteredNotes = (archived: boolean) => {
     return notes
@@ -94,15 +97,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           const notesArray = Array.isArray(parsed) ? parsed : [parsed];
           onImport(notesArray);
         } else {
+          // Fallback manual ID generation
+          const safeId = Math.random().toString(36).substring(2, 11);
           const newNote: Note = {
-            id: crypto.randomUUID(),
+            id: safeId,
             title: file.name.replace(/\.[^/.]+$/, ""),
             content: content,
             updatedAt: Date.now(),
             tasks: [],
             tags: ['imported'],
             category: 'General',
-            pages: [{ id: crypto.randomUUID(), title: 'Main', content: content }],
+            pages: [{ id: safeId + '-p1', title: 'Main', content: content }],
             activePageIndex: 0
           };
           onImport([newNote]);
@@ -213,7 +218,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               {isCollectionsExpanded && (
                 <div className="mt-1.5 space-y-0.5 max-h-40 overflow-y-auto scrollbar-hide py-1 animate-in fade-in slide-in-from-top-2 duration-300">
                   <button onClick={() => { onSelectCategory('All'); setIsCollectionsExpanded(false); }} className={`w-full text-left px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${activeCategory === 'All' ? `bg-zinc-800/40 ${t.accentText}` : `${t.textSecondary} hover:text-zinc-200 hover:bg-zinc-900/30`}`}>All Items</button>
-                  {allCategories.map(cat => (
+                  {allCategoriesList.map(cat => (
                     <button key={cat} onClick={() => { onSelectCategory(cat); setIsCollectionsExpanded(false); }} className={`w-full text-left px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${activeCategory === cat ? `bg-zinc-800/40 ${t.accentText}` : `${t.textSecondary} hover:text-zinc-200 hover:bg-zinc-900/30`}`}>{cat}</button>
                   ))}
                 </div>

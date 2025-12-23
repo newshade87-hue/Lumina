@@ -22,6 +22,14 @@ type TaskFilter = 'all' | 'pending' | 'completed' | 'dropped' | 'cancelled';
 type SaveStatus = 'idle' | 'saving' | 'saved';
 type ExportFormat = 'json' | 'txt' | 'md' | 'pdf' | 'docx' | 'xlsx';
 
+// Safe ID generator fallback
+const generateSafeId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 const detectImportance = (text: string): Importance | null => {
   const lower = text.toLowerCase();
   if (/\b(urgent|asap|critical|emergency|immediately|instant)\b/.test(lower)) return Importance.CRITICAL;
@@ -56,7 +64,11 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const saveTimeoutRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const pages = note.pages || [{ id: crypto.randomUUID(), title: 'Main', content: note.content || '' }];
+  // Use the safety migration to ensure pages always exist
+  const pages = note.pages && note.pages.length > 0 
+    ? note.pages 
+    : [{ id: generateSafeId(), title: 'Main', content: note.content || '' }];
+    
   const activePageIndex = note.activePageIndex ?? 0;
   const currentPage = pages[activePageIndex] || pages[0];
 
@@ -147,7 +159,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
 
   const addPage = () => {
     saveHistory(note);
-    const newPage: Page = { id: crypto.randomUUID(), title: `Page ${pages.length + 1}`, content: '' };
+    const newPage: Page = { id: generateSafeId(), title: `Page ${pages.length + 1}`, content: '' };
     const updatedPages = [...pages, newPage];
     onUpdate({ ...note, pages: updatedPages, activePageIndex: updatedPages.length - 1, updatedAt: Date.now() });
     triggerSaveIndicator();
@@ -222,7 +234,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const addTask = (text: string, importance: Importance, dueDate?: string) => {
     if (!text.trim()) return;
     const newTask: Task = {
-      id: crypto.randomUUID(),
+      id: generateSafeId(),
       text: text.trim(),
       completed: false,
       status: TaskStatus.PENDING,
@@ -356,7 +368,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       const newTasks: Task[] = result.suggestedTasks
         .filter(st => !currentTaskTexts.includes(st.text.toLowerCase()))
         .map(st => ({ 
-          id: crypto.randomUUID(), 
+          id: generateSafeId(), 
           text: st.text, 
           importance: st.importance, 
           completed: false, 
