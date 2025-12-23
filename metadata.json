@@ -1,0 +1,5 @@
+{
+  "name": "Lumina Notes & Tasks",
+  "description": "A smart productivity app that combines rich note-taking with a prioritized task manager, powered by Gemini for intelligent task extraction and priority suggestions.",
+  "requestFramePermissions": []
+}

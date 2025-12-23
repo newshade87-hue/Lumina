@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lumina Notes & Tasks</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    ::selection {
+      background-color: rgba(99, 102, 241, 0.4);
+      color: #ffffff;
+    }
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.01); }
+    }
+    @keyframes gradient-flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .glow-outline-flow {
+      position: relative;
+      border: 1.5px solid transparent !important;
+      background-clip: padding-box, border-box;
+      background-origin: border-box;
+      background-image: linear-gradient(var(--inner-bg, black), var(--inner-bg, black)), 
+                        linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #06b6d4, #6366f1);
+      background-size: 100% 100%, 300% 100%;
+      animation: gradient-flow 6s linear infinite;
+    }
+    .animate-glow-pulse {
+      animation: glow-pulse 3s ease-in-out infinite;
+    }
+    .markdown-preview h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 1rem; }
+    .markdown-preview h2 { font-size: 1.875rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .markdown-preview h3 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .markdown-preview p { margin-bottom: 1rem; }
+    .markdown-preview ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
+    .markdown-preview ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
+    .markdown-preview blockquote { border-left: 4px solid #4f46e5; padding-left: 1rem; color: #71717a; font-style: italic; }
+    .markdown-preview code { background-color: rgba(255,255,255,0.05); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "marked": "https://esm.sh/marked@^15.0.0"
+  }
+}
+</script>
+</head>
+<body class="bg-black">
+  <div id="root"></div>
+</body>
+</html>
