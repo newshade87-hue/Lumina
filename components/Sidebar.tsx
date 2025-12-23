@@ -1,7 +1,6 @@
-
 import React, { useState, useRef } from 'react';
-import { Note, ThemeId } from '../types';
-import { CATEGORIES, THEME_CONFIGS } from '../constants';
+import { Note, ThemeId, User } from '../types';
+import { THEME_CONFIGS, CATEGORIES } from '../constants';
 
 interface SidebarProps {
   notes: Note[];
@@ -19,6 +18,8 @@ interface SidebarProps {
   viewingArchive: boolean;
   setViewingArchive: (v: boolean) => void;
   onImport: (notes: Note[]) => void;
+  user: User;
+  onLogout: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -34,42 +35,44 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   customCategories,
   onAddCategory,
-  viewingArchive,
-  setViewingArchive,
-  onImport
+  onImport,
+  user,
+  onLogout
 }) => {
   const [search, setSearch] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [showAddCat, setShowAddCat] = useState(false);
   const [isCollectionsExpanded, setIsCollectionsExpanded] = useState(false);
   const [isFeedExpanded, setIsFeedExpanded] = useState(true);
+  const [isVaultExpanded, setIsVaultExpanded] = useState(false);
   const t = THEME_CONFIGS[currentTheme];
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const allCategories = [...CATEGORIES, ...customCategories];
+  const allCategories = [...(CATEGORIES || []), ...customCategories];
 
-  const visibleNotes = notes.filter(n => viewingArchive ? !!n.isArchived : !n.isArchived);
+  const getFilteredNotes = (archived: boolean) => {
+    return notes
+      .filter(n => archived ? !!n.isArchived : !n.isArchived)
+      .filter(n => activeCategory === 'All' || n.category === activeCategory)
+      .map(n => {
+        let score = 0;
+        const lowerSearch = search.toLowerCase();
+        if (search) {
+          if (n.title.toLowerCase().includes(lowerSearch)) score += 10;
+          if (n.content?.toLowerCase().includes(lowerSearch)) score += 2;
+          if (n.tags?.some(tag => tag.toLowerCase().includes(lowerSearch))) score += 5;
+        } else {
+          score = 1;
+        }
+        return { note: n, score };
+      })
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || b.note.updatedAt - a.note.updatedAt)
+      .map(item => item.note);
+  };
 
-  const filteredByCategory = activeCategory === 'All' 
-    ? visibleNotes 
-    : visibleNotes.filter(n => n.category === activeCategory);
-
-  const filteredNotes = filteredByCategory
-    .map(n => {
-      let score = 0;
-      const lowerSearch = search.toLowerCase();
-      if (search) {
-        if (n.title.toLowerCase().includes(lowerSearch)) score += 10;
-        if (n.content.toLowerCase().includes(lowerSearch)) score += 2;
-        if (n.tags?.some(tag => tag.toLowerCase().includes(lowerSearch))) score += 5;
-      } else {
-        score = 1;
-      }
-      return { note: n, score };
-    })
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score || b.note.updatedAt - a.note.updatedAt)
-    .map(item => item.note);
+  const activeNotes = getFilteredNotes(false);
+  const archivedNotes = getFilteredNotes(true);
 
   const handleAddCategory = () => {
     if (newCatName.trim()) {
@@ -173,13 +176,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          <div className="flex p-0.5 bg-zinc-900/60 rounded-lg border border-zinc-800/80">
-            <button onClick={() => setViewingArchive(false)} className={`flex-1 py-1 text-[8px] font-black rounded-md uppercase tracking-widest transition-all ${!viewingArchive ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>Active</button>
-            <button onClick={() => setViewingArchive(true)} className={`flex-1 py-1 text-[8px] font-black rounded-md uppercase tracking-widest transition-all ${viewingArchive ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>Vault</button>
-          </div>
-
           <div className="relative group glow-outline-flow rounded-lg" style={defaultStyles}>
-            <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className={`w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-transparent ${t.textPrimary} focus:outline-none transition-all placeholder:opacity-30`} />
+            <input type="text" placeholder="Search Intel..." value={search} onChange={(e) => setSearch(e.target.value)} className={`w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-transparent ${t.textPrimary} focus:outline-none transition-all placeholder:opacity-30`} />
             <svg className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${t.textSecondary} opacity-40`} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           </div>
           
@@ -191,10 +189,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
               New Draft
-            </button>
-            <button onClick={() => fileInputRef.current?.click()} className={`w-full py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 bg-indigo-500/5 text-indigo-400 border border-indigo-500/10 hover:bg-indigo-500/10`}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/></svg>
-              Import
             </button>
           </div>
         </div>
@@ -211,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
-              <button onClick={() => setIsCollectionsExpanded(!isCollectionsExpanded)} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all glow-outline-flow group`} style={defaultStyles}>
+              <button onClick={() => setIsCollectionsExpanded(!isCollectionsExpanded)} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all glow-outline-flow group ${t.glow}`} style={defaultStyles}>
                 <span className={`text-[10px] font-bold ${t.textPrimary} truncate`}>{activeCategory}</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${t.textSecondary} ${isCollectionsExpanded ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
               </button>
@@ -233,31 +227,29 @@ const Sidebar: React.FC<SidebarProps> = ({
               )}
             </section>
 
-            {/* Feed Section - Drodown Style */}
+            {/* Recent Feed Section */}
             <section>
-              <button 
-                onClick={() => setIsFeedExpanded(!isFeedExpanded)}
-                className="w-full flex items-center justify-between mb-2 px-1 group cursor-pointer"
-              >
+              <button onClick={() => setIsFeedExpanded(!isFeedExpanded)} className="w-full flex items-center justify-between mb-2 px-1 group cursor-pointer">
                 <div className="flex items-center gap-1.5">
-                  <h2 className={`text-[9px] font-black uppercase tracking-[0.2em] ${t.textSecondary}`}>{viewingArchive ? 'The Vault' : 'Recent Feed'}</h2>
-                  <span className={`text-[8px] font-black ${t.textSecondary} opacity-40 bg-zinc-800/50 px-1 rounded`}>{filteredNotes.length}</span>
+                  <h2 className={`text-[9px] font-black uppercase tracking-[0.2em] ${t.textSecondary}`}>Recent Feed</h2>
+                  <span className={`text-[8px] font-black ${t.textSecondary} opacity-40 bg-zinc-800/50 px-1 rounded`}>{activeNotes.length}</span>
                 </div>
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${t.textSecondary} ${isFeedExpanded ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
               </button>
 
               {isFeedExpanded && (
                 <div className="space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {filteredNotes.length === 0 ? (
+                  {activeNotes.length === 0 ? (
                     <div className="px-1 py-4 text-center">
-                      <p className={`text-[10px] font-medium italic ${t.textSecondary} opacity-30`}>Empty...</p>
+                      <p className={`text-[10px] font-medium italic ${t.textSecondary} opacity-30`}>No active drafts...</p>
                     </div>
                   ) : (
-                    filteredNotes.map(note => (
+                    activeNotes.map(note => (
                       <button
                         key={note.id}
                         onClick={() => { onSelectNote(note.id); if(window.innerWidth < 768) onClose(); }}
-                        className={`w-full text-left p-3.5 rounded-2xl transition-all group border ${activeNoteId === note.id ? `${t.card} ${t.sidebarBorder} border-indigo-500/50 ${t.glow} translate-x-1` : `border-zinc-800/40 hover:bg-zinc-900/30 hover:border-zinc-700 shadow-sm`}`}
+                        className={`w-full text-left p-3.5 rounded-2xl transition-all group border glow-outline-flow ${activeNoteId === note.id ? `${t.card} border-indigo-500/50 ${t.glow} translate-x-1` : `border-zinc-800/40 hover:bg-zinc-900/30 hover:border-zinc-700 shadow-sm`}`}
+                        style={activeNoteId === note.id ? { '--inner-bg': getInnerBg() } as any : {}}
                       >
                         <span className={`block font-bold text-[11px] truncate mb-0.5 ${activeNoteId === note.id ? t.textPrimary : `${t.textSecondary} group-hover:text-zinc-200`}`}>
                           {note.title || 'Untitled Draft'}
@@ -275,30 +267,83 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               )}
             </section>
+
+            {/* The Vault Section */}
+            <section>
+              <button onClick={() => setIsVaultExpanded(!isVaultExpanded)} className="w-full flex items-center justify-between mb-2 px-1 group cursor-pointer">
+                <div className="flex items-center gap-1.5">
+                  <h2 className={`text-[9px] font-black uppercase tracking-[0.2em] ${t.textSecondary}`}>The Vault</h2>
+                  <span className={`text-[8px] font-black ${t.textSecondary} opacity-40 bg-zinc-800/50 px-1 rounded`}>{archivedNotes.length}</span>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${t.textSecondary} ${isVaultExpanded ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+
+              {isVaultExpanded && (
+                <div className="space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {archivedNotes.length === 0 ? (
+                    <div className="px-1 py-4 text-center">
+                      <p className={`text-[10px] font-medium italic ${t.textSecondary} opacity-30`}>The vault is empty...</p>
+                    </div>
+                  ) : (
+                    archivedNotes.map(note => (
+                      <button
+                        key={note.id}
+                        onClick={() => { onSelectNote(note.id); if(window.innerWidth < 768) onClose(); }}
+                        className={`w-full text-left p-3.5 rounded-2xl transition-all group border glow-outline-flow ${activeNoteId === note.id ? `${t.card} border-indigo-500/50 ${t.glow} translate-x-1` : `border-zinc-800/40 hover:bg-zinc-900/30 hover:border-zinc-700 shadow-sm opacity-60 grayscale hover:grayscale-0 hover:opacity-100`}`}
+                        style={activeNoteId === note.id ? { '--inner-bg': getInnerBg() } as any : {}}
+                      >
+                        <span className={`block font-bold text-[11px] truncate mb-0.5 ${activeNoteId === note.id ? t.textPrimary : `${t.textSecondary} group-hover:text-zinc-200`}`}>
+                          {note.title || 'Untitled Draft'}
+                        </span>
+                        <div className="mt-2 flex items-center justify-between text-[7px] font-black uppercase tracking-widest opacity-40">
+                          <span>Archived</span>
+                          <span>{new Date(note.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </section>
           </div>
         </div>
 
-        {/* Theme Section */}
-        <div className={`p-4 border-t ${t.sidebarBorder} bg-black/10`}>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h2 className={`text-[9px] font-black uppercase tracking-[0.25em] ${t.textSecondary}`}>Themes</h2>
-          </div>
-          <div className="flex gap-2 justify-center flex-wrap">
-            {(Object.keys(THEME_CONFIGS) as ThemeId[]).map((themeId) => {
-              const isActive = currentTheme === themeId;
-              const theme = THEME_CONFIGS[themeId];
-              return (
-                <button
-                  key={themeId}
-                  onClick={() => onThemeChange(themeId)}
-                  className={`w-6 h-6 rounded-full border transition-all relative overflow-hidden flex items-center justify-center ${isActive ? `border-indigo-500 ring-2 ring-indigo-500/30 scale-110 ${theme.glow}` : 'border-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'}`}
-                  style={{ backgroundColor: getThemePreviewColor(themeId) }}
-                  title={theme.name}
-                >
-                  {isActive && <div className="w-2 h-2 rounded-full bg-white/90 shadow-sm" />}
+        {/* Profile Section */}
+        <div className={`p-4 border-t ${t.sidebarBorder} bg-black/20 space-y-4`}>
+          <div className="flex flex-col gap-3">
+             <div className="flex items-center gap-3 px-1">
+                <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 overflow-hidden shadow-lg shrink-0">
+                  <img src={user.avatar || `https://api.dicebear.com/7.x/shapes/svg?seed=${user.email}`} alt="User" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex flex-col overflow-hidden">
+                   <span className={`text-[10px] font-black uppercase tracking-tight truncate ${t.textPrimary}`}>{user.name}</span>
+                   <span className={`text-[7px] font-bold opacity-40 truncate ${t.textSecondary}`}>{user.email}</span>
+                </div>
+                <button onClick={onLogout} className="ml-auto p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500/60 hover:text-rose-500 transition-all" title="Logout">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 </button>
-              );
-            })}
+             </div>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className={`text-[8px] font-black uppercase tracking-[0.25em] ${t.textSecondary} px-1 opacity-60`}>Themes</h2>
+            <div className="flex gap-2 justify-center flex-wrap">
+              {(Object.keys(THEME_CONFIGS) as ThemeId[]).map((themeId) => {
+                const isActive = currentTheme === themeId;
+                const theme = THEME_CONFIGS[themeId];
+                return (
+                  <button
+                    key={themeId}
+                    onClick={() => onThemeChange(themeId)}
+                    className={`w-6 h-6 rounded-full border transition-all relative overflow-hidden flex items-center justify-center ${isActive ? `border-indigo-500 ring-2 ring-indigo-500/30 scale-110 ${theme.glow}` : 'border-zinc-800 opacity-60 hover:opacity-100 hover:scale-105'}`}
+                    style={{ backgroundColor: getThemePreviewColor(themeId) }}
+                    title={theme.name}
+                  >
+                    {isActive && <div className="w-2 h-2 rounded-full bg-white/90 shadow-sm" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </aside>

@@ -15,6 +15,14 @@ export enum TaskStatus {
 
 export type ThemeId = 'onyx' | 'quartz' | 'midnight' | 'forest' | 'matrix' | 'arcade' | 'nebula';
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  provider: 'local' | 'google';
+}
+
 export interface Task {
   id: string;
   text: string;

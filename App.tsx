@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Note, ThemeId, Page } from './types';
+import { Note, ThemeId, User } from './types';
 import Sidebar from './components/Sidebar';
 import NoteEditor from './components/NoteEditor';
+import Auth from './components/Auth';
 import { STORAGE_KEY, THEME_STORAGE_KEY, THEME_CONFIGS, CATEGORIES } from './constants';
 
 const App: React.FC = () => {
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -15,10 +17,31 @@ const App: React.FC = () => {
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [viewingArchive, setViewingArchive] = useState(false);
 
+  // Load User from Local Session
   useEffect(() => {
-    const savedNotes = localStorage.getItem(STORAGE_KEY);
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId;
-    const savedCustomCats = localStorage.getItem(STORAGE_KEY + '_cats');
+    const savedUser = localStorage.getItem('lumina_auth_user');
+    if (savedUser) {
+      try {
+        setAuthUser(JSON.parse(savedUser));
+      } catch(e) {
+        console.error("Auth session corrupted");
+      }
+    }
+  }, []);
+
+  // Load User Data when AuthUser changes
+  useEffect(() => {
+    if (!authUser) {
+      setNotes([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const userStorageKey = `${STORAGE_KEY}_${authUser.id}`;
+    const savedNotes = localStorage.getItem(userStorageKey);
+    const savedTheme = localStorage.getItem(`${THEME_STORAGE_KEY}_${authUser.id}`) as ThemeId;
+    const savedCustomCats = localStorage.getItem(`${userStorageKey}_cats`);
     
     if (savedNotes) {
       try {
@@ -28,7 +51,7 @@ const App: React.FC = () => {
           if (!n.pages || n.pages.length === 0) {
             return {
               ...n,
-              pages: [{ id: 'page-1', title: 'Main', content: n.content || '' }],
+              pages: [{ id: crypto.randomUUID(), title: 'Main', content: n.content || '' }],
               activePageIndex: 0
             };
           }
@@ -40,7 +63,7 @@ const App: React.FC = () => {
           if (firstNonArchived) setActiveNoteId(firstNonArchived.id);
         }
       } catch (e) {
-        console.error("Failed to parse saved notes", e);
+        console.error("Failed to parse user notes", e);
       }
     }
 
@@ -57,25 +80,28 @@ const App: React.FC = () => {
     }
     
     setIsLoading(false);
-  }, []);
+  }, [authUser]);
 
+  // Persist Data
   useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+    if (!isLoading && authUser) {
+      const userStorageKey = `${STORAGE_KEY}_${authUser.id}`;
+      localStorage.setItem(userStorageKey, JSON.stringify(notes));
+      localStorage.setItem(`${userStorageKey}_cats`, JSON.stringify(customCategories));
+      localStorage.setItem(`${THEME_STORAGE_KEY}_${authUser.id}`, currentTheme);
     }
-  }, [notes, isLoading]);
+  }, [notes, customCategories, currentTheme, isLoading, authUser]);
 
-  useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
-    }
-  }, [currentTheme, isLoading]);
+  const handleLogin = (user: User) => {
+    localStorage.setItem('lumina_auth_user', JSON.stringify(user));
+    setAuthUser(user);
+  };
 
-  useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem(STORAGE_KEY + '_cats', JSON.stringify(customCategories));
-    }
-  }, [customCategories, isLoading]);
+  const handleLogout = () => {
+    localStorage.removeItem('lumina_auth_user');
+    setAuthUser(null);
+    setActiveNoteId(null);
+  };
 
   const handleCreateNote = (category?: string) => {
     const newNote: Note = {
@@ -100,12 +126,14 @@ const App: React.FC = () => {
 
   const handleDeleteNote = (id: string) => {
     const noteToDelete = notes.find(n => n.id === id);
-    if (noteToDelete?.isArchived) {
+    if (!noteToDelete) return;
+
+    if (noteToDelete.isArchived) {
       const newNotes = notes.filter(n => n.id !== id);
       setNotes(newNotes);
       if (activeNoteId === id) setActiveNoteId(null);
     } else {
-      handleUpdateNote({ ...noteToDelete!, isArchived: true, updatedAt: Date.now() });
+      handleUpdateNote({ ...noteToDelete, isArchived: true, updatedAt: Date.now() });
       setActiveNoteId(null);
     }
   };
@@ -126,7 +154,6 @@ const App: React.FC = () => {
   };
 
   const handleImport = (importedNotes: Note[]) => {
-    // Migration for imports
     const migrated = importedNotes.map(n => {
       if (!n.pages || n.pages.length === 0) {
         return {
@@ -149,12 +176,16 @@ const App: React.FC = () => {
   const activeNote = notes.find(n => n.id === activeNoteId);
   const t = THEME_CONFIGS[currentTheme];
 
+  if (!authUser) {
+    return <Auth currentTheme={currentTheme} onLogin={handleLogin} />;
+  }
+
   if (isLoading) {
     return (
       <div className={`flex h-screen items-center justify-center bg-black`}>
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(79,70,229,0.2)]" />
-          <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[8px]">Synchronizing</p>
+          <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[8px]">Synchronizing Secure Vault</p>
         </div>
       </div>
     );
@@ -178,6 +209,8 @@ const App: React.FC = () => {
         viewingArchive={viewingArchive}
         setViewingArchive={setViewingArchive}
         onImport={handleImport}
+        user={authUser}
+        onLogout={handleLogout}
       />
       
       <main className="flex-1 h-full overflow-hidden flex flex-col relative transition-all duration-300">
@@ -205,7 +238,7 @@ const App: React.FC = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" md:width="32" md:height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={`${t.accentText} opacity-40`}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
               </div>
               <h2 className={`text-2xl md:text-3xl font-black tracking-tighter ${t.textPrimary}`}>
-                {viewingArchive ? 'Archive Vault' : 'Deep Work'}
+                Welcome back, {authUser.name}
               </h2>
               <p className={`text-[11px] md:text-sm leading-relaxed font-medium ${t.textSecondary} opacity-60 px-4`}>
                 {viewingArchive ? 'Browse through your past records. You can restore them anytime or erase them forever.' : 'Select an entry or start a new draft to enter your distraction-free workspace.'}

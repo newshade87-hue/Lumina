@@ -47,22 +47,23 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
-  // Fixed: taskFilter initialization was incorrectly using the variable before declaration.
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [tagInput, setTagInput] = useState('');
+  const [lastClearedContent, setLastClearedContent] = useState<string | null>(null);
   
   const historyRef = useRef<{ undo: Partial<Note>[], redo: Partial<Note>[] }>({ undo: [], redo: [] });
   const isUndoRedoAction = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const pages = note.pages || [{ id: 'page-1', title: 'Main', content: note.content || '' }];
+  const pages = note.pages || [{ id: crypto.randomUUID(), title: 'Main', content: note.content || '' }];
   const activePageIndex = note.activePageIndex ?? 0;
   const currentPage = pages[activePageIndex] || pages[0];
 
   useEffect(() => {
     setAiResult(null);
     setViewMode('edit');
+    setLastClearedContent(null);
     historyRef.current = { undo: [], redo: [] };
     setSaveStatus('idle');
   }, [note.id]);
@@ -199,16 +200,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     onClose();
   };
 
-  const handleArchive = () => {
-    onUpdate({ ...note, isArchived: true, updatedAt: Date.now() });
-    onClose();
-  };
-
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onUpdate({ ...note, category: e.target.value, updatedAt: Date.now() });
-    triggerSaveIndicator();
-  };
-
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && tagInput.trim()) {
       e.preventDefault();
@@ -260,6 +251,42 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     triggerSaveIndicator();
   };
 
+  const handleClearPage = () => {
+    if (!currentPage.content) return;
+    saveHistory(note);
+    setLastClearedContent(currentPage.content);
+    
+    const updatedPages = [...pages];
+    updatedPages[activePageIndex] = { ...currentPage, content: '' };
+    const firstPageContent = updatedPages[0]?.content || '';
+    
+    onUpdate({ 
+      ...note, 
+      pages: updatedPages, 
+      content: firstPageContent, 
+      updatedAt: Date.now() 
+    });
+    triggerSaveIndicator();
+  };
+
+  const handleRestoreCleared = () => {
+    if (lastClearedContent === null) return;
+    saveHistory(note);
+    
+    const updatedPages = [...pages];
+    updatedPages[activePageIndex] = { ...currentPage, content: lastClearedContent };
+    const firstPageContent = updatedPages[0]?.content || '';
+    
+    onUpdate({ 
+      ...note, 
+      pages: updatedPages, 
+      content: firstPageContent, 
+      updatedAt: Date.now() 
+    });
+    setLastClearedContent(null);
+    triggerSaveIndicator();
+  };
+
   const handleExport = (format: ExportFormat) => {
     let contentBlob: Blob;
     const fileName = `${note.title || 'untitled'}.${format}`;
@@ -286,7 +313,37 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    const printEl = document.getElementById('print-container');
+    if (printEl) {
+      printEl.innerHTML = `
+        <div style="font-family: Inter, sans-serif; padding: 20px;">
+          <h1 style="font-size: 28px; font-weight: 900; margin-bottom: 8px; color: black;">${note.title || 'Untitled Draft'}</h1>
+          <p style="font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 24px;">Lumina Intellectual Record • ${new Date().toLocaleString()}</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 24px;" />
+          <div class="markdown-preview" style="color: black !important; font-size: 14px; line-height: 1.6;">
+            ${marked.parse(currentPage.content || '')}
+          </div>
+          ${note.tasks.length > 0 ? `
+            <div style="margin-top: 40px; page-break-before: auto;">
+              <h2 style="font-size: 18px; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px; color: black;">Action Items</h2>
+              ${note.tasks.map(t => `
+                <div style="margin-bottom: 10px; font-size: 13px; display: flex; align-items: flex-start; gap: 10px; color: black;">
+                  <span style="font-weight: 900; color: #4f46e5;">[${t.status === 'Completed' ? '✔' : ' '}]</span>
+                  <div>
+                    <span style="${t.status === 'Completed' ? 'text-decoration: line-through; color: #888;' : 'font-weight: 600;'}">${t.text}</span>
+                    <span style="font-size: 9px; margin-left: 8px; color: #999;">(${t.importance})</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+      // Small delay ensures content is rendered before print dialog opens
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -370,7 +427,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       {/* Confirm Export Modal */}
       {showConfirmModal === 'export' && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className={`${t.sidebar} ${t.editorBorder} border p-6 rounded-[25px] shadow-2xl max-w-md w-full text-center space-y-4 glow-outline-flow`} style={glowStyles}>
+          <div className={`${t.sidebar} ${t.editorBorder} border p-6 rounded-[25px] shadow-2xl max-w-md w-full text-center space-y-4 glow-outline-flow transition-all duration-500`} style={glowStyles}>
             <h3 className={`text-lg font-black tracking-tighter ${t.textPrimary}`}>Choose Export Format</h3>
             <div className="grid grid-cols-2 gap-2">
               {(['json', 'txt', 'md', 'docx'] as ExportFormat[]).map(format => (
@@ -419,7 +476,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-12 scrollbar-hide bg-zinc-950/20 print-area">
+            <div className="flex-1 overflow-y-auto p-6 md:p-12 scrollbar-hide bg-zinc-950/20">
               <div className={`markdown-preview ${t.textPrimary} prose prose-invert max-w-none opacity-90 leading-relaxed`} style={{ fontSize: `${fontSize}px` }} dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
             </div>
           </div>
@@ -466,7 +523,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               <button onClick={handleManualSave} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg ${t.button} ${t.buttonText} active:scale-95 transition-all`}>Save</button>
               <button onClick={handleSaveAndClose} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border ${t.editorBorder} ${t.textPrimary} bg-black/40 active:scale-95 transition-all`}>Done</button>
               <div className="flex-1" />
-              <button onClick={() => setShowConfirmModal('delete')} className={`p-2 text-rose-500 opacity-60 hover:opacity-100 rounded-xl hover:bg-rose-500/10 transition-all`} title="Delete"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg></button>
+              <button onClick={() => { if(confirm('Erase this record from active memory?')) onDelete(note.id); }} className={`p-2 text-rose-500 opacity-60 hover:opacity-100 rounded-xl hover:bg-rose-500/10 transition-all`} title="Delete"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg></button>
             </div>
           </header>
 
@@ -502,6 +559,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             </div>
 
             <div className="flex items-center gap-1 p-2 border-b border-zinc-800/20 bg-black/30 overflow-x-auto scrollbar-hide">
+              <button onClick={undo} disabled={historyRef.current.undo.length === 0} className={`px-2 py-2 hover:bg-zinc-800 rounded-lg transition-all ${historyRef.current.undo.length === 0 ? 'opacity-20' : 'opacity-100'}`} title="Undo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v.5"/></svg>
+              </button>
+              <button onClick={redo} disabled={historyRef.current.redo.length === 0} className={`px-2 py-2 hover:bg-zinc-800 rounded-lg transition-all ${historyRef.current.redo.length === 0 ? 'opacity-20' : 'opacity-100'}`} title="Redo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v.5"/></svg>
+              </button>
+              <div className="w-px h-5 bg-zinc-800/30 mx-2 shrink-0" />
               <button onClick={() => insertFormatting('**', '**')} className={`px-3 py-2 hover:bg-zinc-800 rounded-lg text-[10px] font-black uppercase transition-all ${t.textPrimary}`} title="Bold">B</button>
               <button onClick={() => insertFormatting('_', '_')} className={`px-3 py-2 hover:bg-zinc-800 rounded-lg text-[10px] font-black italic uppercase transition-all ${t.textPrimary}`} title="Italic">I</button>
               <button onClick={() => insertFormatting('- ')} className={`px-3 py-2 hover:bg-zinc-800 rounded-lg text-[10px] font-black uppercase transition-all ${t.textPrimary}`} title="List">• List</button>
@@ -510,7 +574,18 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               <button onClick={() => insertFormatting('# ')} className={`px-3 py-2 hover:bg-zinc-800 rounded-lg text-[10px] font-black uppercase transition-all ${t.textPrimary}`} title="Header">H1</button>
               <button onClick={() => insertFormatting('## ')} className={`px-3 py-2 hover:bg-zinc-800 rounded-lg text-[10px] font-black uppercase transition-all ${t.textPrimary}`} title="Header 2">H2</button>
               <div className="flex-1" />
-              <button onClick={() => { if(confirm('Clear current page?')) handlePageContentChange({ target: { value: '' } } as any); }} className="px-3 py-2 hover:bg-rose-500/20 text-rose-500 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] transition-all">Clear</button>
+              
+              {lastClearedContent ? (
+                <button onClick={handleRestoreCleared} className="px-3 py-2 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 13.9-7.1L21 13"/></svg>
+                  Restore
+                </button>
+              ) : (
+                <button onClick={handleClearPage} className="px-3 py-2 hover:bg-rose-500/20 text-rose-500 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+                  Clear
+                </button>
+              )}
             </div>
             
             <div className="p-6 md:p-10 flex-1 min-h-[550px] flex flex-col">
@@ -524,7 +599,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                   className={`w-full flex-1 leading-[1.8] border-none focus:outline-none resize-none bg-transparent ${t.textPrimary} placeholder:opacity-10`} 
                 />
               ) : (
-                <div className={`markdown-preview ${t.textPrimary} flex-1 prose prose-invert max-w-none opacity-90 leading-[1.8] print-area`} style={{ fontSize: `${fontSize}px` }} dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
+                <div className={`markdown-preview ${t.textPrimary} flex-1 prose prose-invert max-w-none opacity-90 leading-[1.8]`} style={{ fontSize: `${fontSize}px` }} dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
               )}
             </div>
           </div>
@@ -545,15 +620,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                       <span className={`text-[12px] font-black font-mono ${t.textPrimary}`}>{completedCount}/{totalCount}</span>
                       <span className={`text-[7px] font-black uppercase tracking-widest ${t.textSecondary} opacity-60`}>Milestones</span>
                    </div>
-                   {/* Improved progress circle container to prevent overflow */}
-                   <div className="w-12 h-12 flex items-center justify-center bg-black/20 rounded-full p-1 border border-zinc-800/40 relative">
-                      <svg className="w-10 h-10 -rotate-90">
-                        <circle cx="20" cy="20" r="17" fill="transparent" stroke="currentColor" strokeWidth="4" className="text-zinc-800/50" />
-                        <circle cx="20" cy="20" r="17" fill="transparent" stroke="currentColor" strokeWidth="4" 
-                                strokeDasharray={`${2 * Math.PI * 17}`} 
-                                strokeDashoffset={`${2 * Math.PI * 17 * (1 - progressPercent / 100)}`}
+                   {/* Sized container to ensure circle is perfectly contained */}
+                   <div className="w-10 h-10 flex items-center justify-center bg-black/40 rounded-full border border-zinc-800/60 relative shrink-0">
+                      <svg width="34" height="34" className="-rotate-90">
+                        <circle cx="17" cy="17" r="14" fill="transparent" stroke="currentColor" strokeWidth="4" className="text-zinc-800/50" />
+                        <circle cx="17" cy="17" r="14" fill="transparent" stroke="currentColor" strokeWidth="4" 
+                                strokeDasharray={`${2 * Math.PI * 14}`} 
+                                strokeDashoffset={`${2 * Math.PI * 14 * (1 - progressPercent / 100)}`}
                                 strokeLinecap="round"
-                                className="text-indigo-500 transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                                className="text-indigo-500 transition-all duration-1000" />
                       </svg>
                       <span className="absolute text-[8px] font-black font-mono text-indigo-400">{Math.round(progressPercent)}%</span>
                    </div>
