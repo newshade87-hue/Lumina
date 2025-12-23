@@ -26,15 +26,23 @@ export interface Task {
   dueDate?: number;
 }
 
-export interface Note {
+export interface Page {
   id: string;
   title: string;
   content: string;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string; // Legacy field, content of the first page
   updatedAt: number;
   tasks: Task[];
   category?: string;
   tags: string[];
   isArchived?: boolean;
+  pages?: Page[];
+  activePageIndex?: number;
 }
 
 export interface AIResult {

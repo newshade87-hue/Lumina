@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Note, ThemeId } from './types';
+import { Note, ThemeId, Page } from './types';
 import Sidebar from './components/Sidebar';
 import NoteEditor from './components/NoteEditor';
 import { STORAGE_KEY, THEME_STORAGE_KEY, THEME_CONFIGS, CATEGORIES } from './constants';
@@ -22,7 +22,18 @@ const App: React.FC = () => {
     
     if (savedNotes) {
       try {
-        const parsed = JSON.parse(savedNotes);
+        let parsed = JSON.parse(savedNotes);
+        // Migration: Ensure all notes have pages array
+        parsed = parsed.map((n: Note) => {
+          if (!n.pages || n.pages.length === 0) {
+            return {
+              ...n,
+              pages: [{ id: 'page-1', title: 'Main', content: n.content || '' }],
+              activePageIndex: 0
+            };
+          }
+          return n;
+        });
         setNotes(parsed);
         if (parsed.length > 0) {
           const firstNonArchived = parsed.find((n: Note) => !n.isArchived);
@@ -75,6 +86,8 @@ const App: React.FC = () => {
       updatedAt: Date.now(),
       tasks: [],
       tags: [],
+      pages: [{ id: crypto.randomUUID(), title: 'Draft 1', content: '' }],
+      activePageIndex: 0
     };
     setNotes([newNote, ...notes]);
     setActiveNoteId(newNote.id);
@@ -113,7 +126,18 @@ const App: React.FC = () => {
   };
 
   const handleImport = (importedNotes: Note[]) => {
-    setNotes(prev => [...importedNotes, ...prev]);
+    // Migration for imports
+    const migrated = importedNotes.map(n => {
+      if (!n.pages || n.pages.length === 0) {
+        return {
+          ...n,
+          pages: [{ id: crypto.randomUUID(), title: 'Main', content: n.content || '' }],
+          activePageIndex: 0
+        };
+      }
+      return n;
+    });
+    setNotes(prev => [...migrated, ...prev]);
   };
 
   const handleAddCategory = (name: string) => {

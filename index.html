@@ -59,6 +59,20 @@
     .markdown-preview ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
     .markdown-preview blockquote { border-left: 4px solid #4f46e5; padding-left: 1rem; color: #71717a; font-style: italic; }
     .markdown-preview code { background-color: rgba(255,255,255,0.05); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; }
+    
+    @media print {
+      body * { visibility: hidden; }
+      .print-area, .print-area * { visibility: visible; }
+      .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        color: black !important;
+        background: white !important;
+      }
+      .no-print { display: none !important; }
+    }
   </style>
 <script type="importmap">
 {
