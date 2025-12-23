@@ -9,7 +9,9 @@ export const analyzeNote = async (content: string): Promise<AIResult | null> => 
     // Safely access API_KEY to prevent crashing if process.env is not defined
     let apiKey = '';
     try {
-      apiKey = process.env.API_KEY || '';
+      if (typeof process !== 'undefined' && process.env) {
+        apiKey = process.env.API_KEY || '';
+      }
     } catch (e) {
       console.warn("Lumina: Environment variables not accessible via process.env");
     }
